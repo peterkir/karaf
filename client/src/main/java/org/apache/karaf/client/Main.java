@@ -25,10 +25,8 @@ import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
 import java.io.Reader;
 import java.lang.reflect.Proxy;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import java.security.KeyPair;
@@ -51,8 +49,6 @@ import org.apache.sshd.client.channel.ClientChannelEvent;
 import org.apache.sshd.client.channel.PtyCapableChannelSession;
 import org.apache.sshd.client.future.ConnectFuture;
 import org.apache.sshd.client.session.ClientSession;
-import org.apache.sshd.common.FactoryManager;
-import org.apache.sshd.common.PropertyResolverUtils;
 import org.apache.sshd.common.RuntimeSshException;
 import org.apache.sshd.common.channel.PtyMode;
 import org.apache.sshd.common.config.keys.FilePasswordProvider;
@@ -143,7 +139,7 @@ public class Main {
                     }
                 });
             }
-            
+
             if (config.getUser()==null || config.getUser().isEmpty()) {
             	while (true) {
             		String user = console.readLine("Enter user: ");
@@ -159,7 +155,7 @@ public class Main {
             else if (console != null) {
                 console.printf("Logging in as %s\n", config.getUser());
             }
-            
+
             setupAgent(config.getUser(), config.getKeyFile(), client, passwordProvider);
 
             // define hearbeat (for the keep alive) and timeouts
@@ -178,19 +174,47 @@ public class Main {
             session.auth().verify();
 
             int exitStatus = 0;
+            String type = System.getProperty(TerminalBuilder.PROP_TYPE);
+            if (type == null) {
+                type = System.getenv("TERM");
+            }
+            if (type == null) {
+                type = Terminal.TYPE_DUMB;
+            }
             try (Terminal terminal = TerminalBuilder.builder()
                         .nativeSignals(true)
+                        .type(type)
                         .signalHandler(Terminal.SignalHandler.SIG_IGN)
                         .build()) {
                 if (config.getCommand().length() > 0) {
                     ChannelExec channel = session.createExecChannel(config.getCommand() + "\n");
                     channel.setIn(new ByteArrayInputStream(new byte[0]));
+                    if (!config.isBatch()) {
+                        new Thread(() -> {
+                            while (true) {
+                                try {
+                                    int a = System.in.read();
+                                    if (a == -1) {
+                                        channel.close(true);
+                                        break;
+                                    }
+                                    Thread.sleep(1000);
+                                } catch (Exception e) {
+                                    //ignore
+                                }
+                            }
+                        }).start();
+                    }
                     channel.setAgentForwarding(true);
                     NoCloseOutputStream output = new NoCloseOutputStream(terminal.output());
                     channel.setOut(output);
                     channel.setErr(output);
                     channel.open().verify();
                     channel.waitFor(EnumSet.of(ClientChannelEvent.CLOSED), 0);
+                    if (channel.getExitStatus() != null) {
+                        exitStatus = channel.getExitStatus();
+                    }
+
                 } else {
                     ChannelShell channel = session.createShellChannel();
                     Attributes attributes = terminal.enterRawMode();
@@ -328,8 +352,7 @@ public class Main {
 
     private static void setupAgent(String user, String keyFile, SshClient client, FilePasswordProvider passwordProvider) {
         SshAgent agent;
-        URL builtInPrivateKey = Main.class.getClassLoader().getResource("karaf.key");
-        agent = startAgent(user, builtInPrivateKey, keyFile, passwordProvider);
+        agent = startAgent(user, keyFile, passwordProvider);
         client.setAgentFactory(new LocalAgentFactory(agent));
         client.getProperties().put(SshAgent.SSH_AUTHSOCKET_ENV_NAME, "local");
     }
@@ -344,7 +367,7 @@ public class Main {
                 session = future.getSession();
             } catch (RuntimeSshException ex) {
                 if (retries++ < config.getRetryAttempts()) {
-                    Thread.sleep(config.getRetryDelay() * 1000);
+                    Thread.sleep(config.getRetryDelay() * 1000L);
                     System.out.println("retrying (attempt " + retries + ") ...");
                 } else {
                     throw ex;
@@ -354,37 +377,20 @@ public class Main {
         return session;
     }
 
-    private static SshAgent startAgent(String user, URL privateKeyUrl, String keyFile, FilePasswordProvider passwordProvider) {
-        InputStream is = null;
+    private static SshAgent startAgent(String user, String keyFile, FilePasswordProvider passwordProvider) {
         try {
             SshAgent agent = new AgentImpl();
-            is = privateKeyUrl.openStream();
-            ObjectInputStream r = new ObjectInputStream(is);
-            KeyPair keyPair = (KeyPair) r.readObject();
-            is.close();
-            agent.addIdentity(keyPair, user);
             if (keyFile != null) {
                 FileKeyPairProvider fileKeyPairProvider = new FileKeyPairProvider(Paths.get(keyFile));
                 fileKeyPairProvider.setPasswordFinder(passwordProvider);
                 for (KeyPair key : fileKeyPairProvider.loadKeys()) {
-                    agent.addIdentity(key, user);                
+                    agent.addIdentity(key, user);
                 }
             }
             return agent;
         } catch (Throwable e) {
-            close(is);
             System.err.println("Error starting ssh agent for: " + e.getMessage());
             return null;
-        }
-    }
-
-    private static void close(Closeable is) {
-        if (is != null) {
-            try {
-                is.close();
-            } catch (IOException e1) {
-                // Ignore
-            }
         }
     }
 

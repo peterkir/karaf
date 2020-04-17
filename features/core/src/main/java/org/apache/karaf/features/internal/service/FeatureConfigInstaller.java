@@ -103,26 +103,38 @@ public class FeatureConfigInstaller {
             // trim lines
             String val = config.getValue();
             if (config.isExternal()) {
-                props.load(new URL(val));
+                try {
+                    props.load(new URL(val));
+                } catch (java.net.MalformedURLException e) {
+                    throw new IOException("Failed to load config info from URL [" + val + "] for feature [" + feature.getName() + "/" + feature.getVersion() + "].", e);
+                }
             } else {
                 props.load(new StringReader(val));
             }
             ConfigId cid = parsePid(config.getName());
             Configuration cfg = findExistingConfiguration(configAdmin, cid);
-            if (cfg == null) {
-                Dictionary<String, Object> cfgProps = convertToDict(props);
-                cfg = createConfiguration(configAdmin, cid.pid, cid.factoryPid);
-                cfgProps.put(CONFIG_KEY, cid.fullPid);
-                props.put(CONFIG_KEY, cid.fullPid);
-                if (storage != null && configCfgStore) {
-                    File cfgFile = new File(storage, cid.fullPid + ".cfg");
-                    cfgProps.put(FILEINSTALL_FILE_NAME, cfgFile.getAbsoluteFile().toURI().toString());
+            if (cfg == null || config.isOverride()) {
+
+                File cfgFile = null;
+                if (storage != null) {
+                    cfgFile = new File(storage, cid.fullPid + ".cfg");
                 }
-                cfg.update(cfgProps);
-                try {
-                    updateStorage(cid, props, false);
-                } catch (Exception e) {
-                    LOGGER.warn("Can't update cfg file", e);
+                if (!cfgFile.exists() || config.isOverride()) {
+                    Dictionary<String, Object> cfgProps = convertToDict(props);
+                    cfg = createConfiguration(configAdmin, cid.pid, cid.factoryPid);
+                    cfgProps.put(CONFIG_KEY, cid.fullPid);
+                    props.put(CONFIG_KEY, cid.fullPid);
+                    if (storage != null && configCfgStore) {
+                        cfgProps.put(FILEINSTALL_FILE_NAME, cfgFile.getAbsoluteFile().toURI().toString());
+                    }
+                    cfg.update(cfgProps);
+                    try {
+                        updateStorage(cid, props, false);
+                    } catch (Exception e) {
+                        LOGGER.warn("Can't update cfg file", e);
+                    }
+                } else {
+                    LOGGER.info("Skipping configuration {} - file already exists", cfgFile);
                 }
             } else if (config.isAppend()) {
                 boolean update = false;
@@ -146,6 +158,36 @@ public class FeatureConfigInstaller {
         for (ConfigFileInfo configFile : feature.getConfigurationFiles()) {
             installConfigurationFile(configFile.getLocation(), configFile.getFinalname(),
                                      configFile.isOverride());
+        }
+    }
+
+    public void uninstallFeatureConfigs(Feature feature) throws IOException, InvalidSyntaxException {
+        if (feature != null) {
+            if (feature.getConfigurations() != null) {
+                for (ConfigInfo configInfo : feature.getConfigurations()) {
+                    ConfigId configId = parsePid(configInfo.getName());
+                    Configuration configuration = findExistingConfiguration(configAdmin, configId);
+                    if (configuration != null) {
+                        configuration.delete();
+                    }
+                    File cfgFile = null;
+                    if (storage != null) {
+                        cfgFile = new File(storage, configId.fullPid + ".cfg");
+                    }
+                    if (cfgFile.exists()) {
+                        cfgFile.delete();
+                    }
+                }
+            }
+            if (feature.getConfigurationFiles() != null) {
+                for (ConfigFileInfo configFileInfo : feature.getConfigurationFiles()) {
+                    String finalname = substFinalName(configFileInfo.getFinalname());
+                    File cfgFile = new File(finalname);
+                    if (cfgFile.exists()) {
+                        cfgFile.delete();
+                    }
+                }
+            }
         }
     }
 
@@ -283,8 +325,7 @@ public class FeatureConfigInstaller {
         return cfgFile;
     }
 
-    private void updateExistingConfig(TypedProperties props, boolean append, File cfgFile)
-        throws IOException {
+    private void updateExistingConfig(TypedProperties props, boolean append, File cfgFile) throws IOException {
         TypedProperties properties = new TypedProperties();
         properties.load(cfgFile);
         for (String key : props.keySet()) {

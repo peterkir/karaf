@@ -128,6 +128,14 @@ public abstract class MojoSupport extends AbstractMojo {
     // called by Plexus when injecting the mojo's session
     public void setMavenSession(MavenSession mavenSession) {
         this.mavenSession = mavenSession;
+
+        if (mavenSession != null) {
+            // check for custom settings.xml and pass it onto pax-url-aether
+            File settingsFile = mavenSession.getRequest().getUserSettingsFile();
+            if (settingsFile != null && settingsFile.isFile()) {
+                System.setProperty("org.ops4j.pax.url.mvn.settings", settingsFile.getPath());
+            }
+        }
     }
 
     protected Map createManagedVersionMap(String projectId,
@@ -267,7 +275,7 @@ public abstract class MojoSupport extends AbstractMojo {
 
         //check if the resourceLocation descriptor contains also remote repository information.
         ArtifactRepository repo = null;
-        if (resourceLocation.startsWith("http://")) {
+        if (resourceLocation.startsWith("http://") || resourceLocation.startsWith("https://")) {
             final int repoDelimIndex = resourceLocation.indexOf('!');
             String repoUrl = resourceLocation.substring(0, repoDelimIndex);
             int paramIndex = repoUrl.indexOf("@");

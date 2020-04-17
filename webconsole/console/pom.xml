@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.apache.karaf.webconsole</groupId>
         <artifactId>webconsole</artifactId>
-        <version>4.2.1-SNAPSHOT</version>
+        <version>4.3.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -44,11 +44,11 @@
 		</dependency>
         <dependency>
             <groupId>org.osgi</groupId>
-            <artifactId>org.osgi.core</artifactId>
+            <artifactId>osgi.core</artifactId>
         </dependency>
         <dependency>
           <groupId>org.osgi</groupId>
-          <artifactId>org.osgi.compendium</artifactId>
+          <artifactId>osgi.cmpn</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.karaf</groupId>
@@ -143,6 +143,7 @@
                             !org.osgi.service.metatype,
                             !org.osgi.service.permissionadmin,
                             !org.osgi.service.wireadmin,
+                            org.osgi.framework;version="[1,3)",
                             *
                         </Import-Package>
                         <DynamicImport-Package>
@@ -165,7 +166,7 @@
                             org.apache.felix.framework;inline=org/apache/felix/framework/util/VersionRange**,
 
                             <!-- ServiceTracker -->
-                            org.osgi.compendium;inline=org/osgi/util/tracker/*,
+                            osgi.cmpn;inline=org/osgi/util/tracker/*,
 
                             <!-- File Upload -->
                             commons-fileupload,

@@ -20,6 +20,8 @@ package org.apache.karaf.util.maven;
 
 import java.net.MalformedURLException;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Parser for mvn: protocol.
@@ -32,6 +34,7 @@ import java.util.Map;
 public class Parser
 {
 
+    private static final Pattern VERSION_FILE_PATTERN = Pattern.compile( "^(.*)-([0-9]{8}\\.[0-9]{6})-([0-9]+)$" );
     /**
      * Default version if none present in the url.
      */
@@ -418,20 +421,39 @@ public class Parser
      */
     public String getArtifactPath( final String version )
     {
-        return new StringBuilder()
-                .append( m_group.replaceAll( GROUP_SEPARATOR, FILE_SEPARATOR ) )
-                .append( FILE_SEPARATOR )
-                .append( m_artifact )
-                .append( FILE_SEPARATOR )
-                .append( version )
-                .append( FILE_SEPARATOR )
-                .append( m_artifact )
-                .append( VERSION_SEPARATOR )
-                .append( version )
-                .append( m_fullClassifier )
-                .append( TYPE_SEPARATOR )
-                .append( m_type )
-                .toString();
+           
+        Matcher m = VERSION_FILE_PATTERN.matcher(version);
+
+        if ( m.matches() )
+        {
+            this.m_version = m.group( 1 ) + "-" + "SNAPSHOT";
+            String ret = m_group.replaceAll(GROUP_SEPARATOR, FILE_SEPARATOR)
+                + FILE_SEPARATOR
+                + m_artifact
+                + FILE_SEPARATOR
+                + m_version
+                + FILE_SEPARATOR
+                + m_artifact
+                + VERSION_SEPARATOR
+                + m_version
+                + m_fullClassifier
+                + TYPE_SEPARATOR
+                + m_type;
+            return ret;
+        } else {
+            return m_group.replaceAll(GROUP_SEPARATOR, FILE_SEPARATOR)
+                + FILE_SEPARATOR
+                + m_artifact
+                + FILE_SEPARATOR
+                + version
+                + FILE_SEPARATOR
+                + m_artifact
+                + VERSION_SEPARATOR
+                + version
+                + m_fullClassifier
+                + TYPE_SEPARATOR
+                + m_type;
+        }
     }
 
     /**
@@ -457,20 +479,18 @@ public class Parser
      */
     public String getSnapshotPath( final String version, final String timestamp, final String buildnumber )
     {
-        return new StringBuilder()
-                .append( m_group.replaceAll( GROUP_SEPARATOR, FILE_SEPARATOR ) )
-                .append( FILE_SEPARATOR )
-                .append( m_artifact )
-                .append( FILE_SEPARATOR )
-                .append( version )
-                .append( FILE_SEPARATOR )
-                .append( m_artifact )
-                .append( VERSION_SEPARATOR )
-                .append( getSnapshotVersion( version, timestamp, buildnumber ) )
-                .append( m_fullClassifier )
-                .append( TYPE_SEPARATOR )
-                .append( m_type )
-                .toString();
+        return m_group.replaceAll(GROUP_SEPARATOR, FILE_SEPARATOR)
+            + FILE_SEPARATOR
+            + m_artifact
+            + FILE_SEPARATOR
+            + version
+            + FILE_SEPARATOR
+            + m_artifact
+            + VERSION_SEPARATOR
+            + getSnapshotVersion(version, timestamp, buildnumber)
+            + m_fullClassifier
+            + TYPE_SEPARATOR
+            + m_type;
     }
 
     /**
@@ -481,15 +501,13 @@ public class Parser
      */
     public String getVersionMetadataPath( final String version )
     {
-        return new StringBuilder()
-                .append( m_group.replaceAll( GROUP_SEPARATOR, FILE_SEPARATOR ) )
-                .append( FILE_SEPARATOR )
-                .append( m_artifact )
-                .append( FILE_SEPARATOR )
-                .append( version )
-                .append( FILE_SEPARATOR )
-                .append( METADATA_FILE )
-                .toString();
+        return m_group.replaceAll(GROUP_SEPARATOR, FILE_SEPARATOR)
+            + FILE_SEPARATOR
+            + m_artifact
+            + FILE_SEPARATOR
+            + version
+            + FILE_SEPARATOR
+            + METADATA_FILE;
     }
 
     /**
@@ -500,15 +518,13 @@ public class Parser
      */
     public String getVersionLocalMetadataPath( final String version )
     {
-        return new StringBuilder()
-                .append( m_group.replaceAll( GROUP_SEPARATOR, FILE_SEPARATOR ) )
-                .append( FILE_SEPARATOR )
-                .append( m_artifact )
-                .append( FILE_SEPARATOR )
-                .append( version )
-                .append( FILE_SEPARATOR )
-                .append( METADATA_FILE_LOCAL )
-                .toString();
+        return m_group.replaceAll(GROUP_SEPARATOR, FILE_SEPARATOR)
+            + FILE_SEPARATOR
+            + m_artifact
+            + FILE_SEPARATOR
+            + version
+            + FILE_SEPARATOR
+            + METADATA_FILE_LOCAL;
     }
 
     /**
@@ -518,13 +534,11 @@ public class Parser
      */
     public String getArtifactLocalMetdataPath()
     {
-        return new StringBuilder()
-                .append( m_group.replaceAll( GROUP_SEPARATOR, FILE_SEPARATOR ) )
-                .append( FILE_SEPARATOR )
-                .append( m_artifact )
-                .append( FILE_SEPARATOR )
-                .append( METADATA_FILE_LOCAL )
-                .toString();
+        return m_group.replaceAll(GROUP_SEPARATOR, FILE_SEPARATOR)
+            + FILE_SEPARATOR
+            + m_artifact
+            + FILE_SEPARATOR
+            + METADATA_FILE_LOCAL;
     }
 
     /**
@@ -534,13 +548,11 @@ public class Parser
      */
     public String getArtifactMetdataPath()
     {
-        return new StringBuilder()
-                .append( m_group.replaceAll( GROUP_SEPARATOR, FILE_SEPARATOR ) )
-                .append( FILE_SEPARATOR )
-                .append( m_artifact )
-                .append( FILE_SEPARATOR )
-                .append( METADATA_FILE )
-                .toString();
+        return m_group.replaceAll(GROUP_SEPARATOR, FILE_SEPARATOR)
+            + FILE_SEPARATOR
+            + m_artifact
+            + FILE_SEPARATOR
+            + METADATA_FILE;
     }
 
 }

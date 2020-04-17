@@ -25,7 +25,10 @@ set PROGNAME=%~nx0%
 set ARGS=%*
 
 rem Sourcing environment settings for karaf similar to tomcats setenv
-SET KARAF_SCRIPT="karaf.bat"
+
+if "%KARAF_SCRIPT%" == "" (
+	SET KARAF_SCRIPT="karaf.bat"
+)
 if exist "%DIRNAME%setenv.bat" (
   call "%DIRNAME%setenv.bat"
 )
@@ -93,6 +96,21 @@ if not "%KARAF_ETC%" == "" (
 )
 if "%KARAF_ETC%" == "" (
     set "KARAF_ETC=%KARAF_BASE%\etc"
+)
+
+if not "%KARAF_LOG%" == "" (
+    if not exist "%KARAF_LOG%" (
+        call :warn KARAF_LOG is not valid: "%KARAF_LOG%"
+        goto END
+    )
+)
+if "%KARAF_LOG%" == "" (
+    set "KARAF_LOG=%KARAF_DATA%\log"
+)
+if not exist "%KARAF_LOG%" (
+    call :warn KARAF_LOG doesn't exist: "%KARAF_LOG%"
+    call :warn Creating "%KARAF_LOG%"
+    mkdir "%KARAF_LOG%"
 )
 
 set LOCAL_CLASSPATH=%CLASSPATH%
@@ -219,6 +237,12 @@ for /f tokens^=2-5^ delims^=.-_+^" %%j in ('"%JAVA%" -fullversion 2^>^&1') do (
     if %%j==1 (set JAVA_VERSION=%%k) else (set JAVA_VERSION=%%j)
 )
 
+if %JAVA_VERSION% GTR 8 (
+   pushd "%KARAF_HOME%\lib\jdk9plus"
+       for %%G in (*.jar) do call:APPEND_TO_JDK9PLUS_CLASSPATH %%G
+   popd
+)
+
 :CheckRootInstance
     set ROOT_INSTANCE_RUNNING=false
     if exist "%KARAF_HOME%\instances\instance.properties" (
@@ -245,14 +269,6 @@ if not exist "%JAVA_HOME%\bin\server\jvm.dll" (
     )
 )
 set DEFAULT_JAVA_OPTS=-Xms%JAVA_MIN_MEM% -Xmx%JAVA_MAX_MEM% -Dcom.sun.management.jmxremote  -XX:+UnlockDiagnosticVMOptions
-
-rem Check some easily accessible MIN/MAX params for JVM mem usage
-if not "%JAVA_PERM_MEM%" == "" (
-    set DEFAULT_JAVA_OPTS=%DEFAULT_JAVA_OPTS% -XX:PermSize=%JAVA_PERM_MEM%
-)
-if not "%JAVA_MAX_PERM_MEM%" == "" (
-    set DEFAULT_JAVA_OPTS=%DEFAULT_JAVA_OPTS% -XX:MaxPermSize=%JAVA_MAX_PERM_MEM%
-)
 
 if "%JAVA_OPTS%" == "" set JAVA_OPTS=%DEFAULT_JAVA_OPTS%
 
@@ -291,6 +307,12 @@ set suffix=%filename:~-4%
 if %suffix% equ .jar set CLASSPATH=%CLASSPATH%;%KARAF_HOME%\lib\boot\%filename%
 goto :EOF
 
+: APPEND_TO_JDK9PLUS_CLASSPATH
+set filename=%~1
+set suffix=%filename:~-4%
+if %suffix% equ .jar set CLASSPATH=%CLASSPATH%;%KARAF_HOME%\lib\jdk9plus\%filename%
+goto :EOF
+
 :CLASSPATH_END
 
 if "%CHECK_ROOT_INSTANCE_RUNNING%" == "" (
@@ -324,6 +346,10 @@ if "%KARAF_PROFILER%" == "" goto :RUN
 :EXECUTE_STOP
     SET MAIN=org.apache.karaf.main.Stop
     SET CHECK_ROOT_INSTANCE_RUNNING=false
+    rem not needed when stopping
+    SET JAVA_OPTS=
+    SET KARAF_SYSTEM_OPTS=
+    SET KARAF_OPTS=
     shift
     goto :RUN_LOOP
 
@@ -404,10 +430,10 @@ if "%KARAF_PROFILER%" == "" goto :RUN
         rem If major version is 1 (meaning Java 1.6, 1.7, 1.8), we use endorsed lib
         if %JAVA_VERSION% GTR 8 (
             "%JAVA%" %JAVA_OPTS% %OPTS% ^
-                --add-exports=java.base/org.apache.karaf.specs.locator=java.xml,java.xml.ws,ALL-UNNAMED ^
+                --add-reads=java.xml=java.logging ^
+                --add-exports=java.base/org.apache.karaf.specs.locator=java.xml,ALL-UNNAMED ^
                 --patch-module java.base=lib/endorsed/org.apache.karaf.specs.locator-@@project.version@@.jar ^
                 --patch-module java.xml=lib/endorsed/org.apache.karaf.specs.java.xml-@@project.version@@.jar ^
-                --patch-module java.xml.ws=lib/endorsed/org.apache.karaf.specs.java.xml.ws-@@project.version@@.jar ^
                 --add-opens java.base/java.security=ALL-UNNAMED ^
                 --add-opens java.base/java.net=ALL-UNNAMED ^
                 --add-opens java.base/java.lang=ALL-UNNAMED ^
@@ -417,15 +443,14 @@ if "%KARAF_PROFILER%" == "" goto :RUN
                 --add-exports=java.base/sun.net.www.protocol.http=ALL-UNNAMED ^
                 --add-exports=java.base/sun.net.www.protocol.https=ALL-UNNAMED ^
                 --add-exports=java.base/sun.net.www.protocol.jar=ALL-UNNAMED ^
-                --add-exports=java.xml.bind/com.sun.xml.internal.bind.v2.runtime=ALL-UNNAMED ^
                 --add-exports=jdk.xml.dom/org.w3c.dom.html=ALL-UNNAMED ^
                 --add-exports=jdk.naming.rmi/com.sun.jndi.url.rmi=ALL-UNNAMED ^
-                --add-modules java.xml.ws.annotation,java.corba,java.transaction,java.xml.bind,java.xml.ws ^
                 -classpath "%CLASSPATH%" ^
                 -Dkaraf.instances="%KARAF_HOME%\instances" ^
                 -Dkaraf.home="%KARAF_HOME%" ^
                 -Dkaraf.base="%KARAF_BASE%" ^
                 -Dkaraf.etc="%KARAF_ETC%" ^
+                -Dkaraf.log="%KARAF_LOG%" ^
                 -Dkaraf.restart.jvm.supported=true ^
                 -Djava.io.tmpdir="%KARAF_DATA%\tmp" ^
                 -Dkaraf.data="%KARAF_DATA%" ^
@@ -440,6 +465,7 @@ if "%KARAF_PROFILER%" == "" goto :RUN
                 -Dkaraf.home="%KARAF_HOME%" ^
                 -Dkaraf.base="%KARAF_BASE%" ^
                 -Dkaraf.etc="%KARAF_ETC%" ^
+                -Dkaraf.log="%KARAF_LOG%" ^
                 -Dkaraf.restart.jvm.supported=true ^
                 -Djava.io.tmpdir="%KARAF_DATA%\tmp" ^
                 -Dkaraf.data="%KARAF_DATA%" ^

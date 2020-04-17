@@ -67,9 +67,9 @@ import org.apache.karaf.shell.support.completers.UriCompleter;
 import org.apache.karaf.util.filesstream.FilesStream;
 import org.jline.builtins.Completers;
 import org.jline.reader.*;
+import org.jline.terminal.Size;
 import org.jline.terminal.Terminal.Signal;
 import org.jline.terminal.impl.DumbTerminal;
-import org.osgi.service.event.EventAdmin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -146,12 +146,20 @@ public class ConsoleSessionImpl implements Session {
             }
         }
 
+        if (jlineTerminal.getSize().getColumns() == 0) {
+            jlineTerminal.setSize(new Size(80, 24));
+        }
+
         brandingProps = Branding.loadBrandingProperties(terminal.getClass().getName().endsWith("SshTerminal"));
 
         // Create session
-        session = processor.createSession(jlineTerminal.input(),
-                jlineTerminal.output(),
-                jlineTerminal.output());
+        if (in == null || out == null || err == null) {
+            session = processor.createSession(((org.jline.terminal.Terminal) terminal).input(),
+                    ((org.jline.terminal.Terminal) terminal).output(),
+                    ((org.jline.terminal.Terminal) terminal).output());
+        } else {
+            session = processor.createSession(in, out, err);
+        }
 
         // Completers
         Completer builtinCompleter = createBuiltinCompleter();
@@ -437,10 +445,10 @@ public class ConsoleSessionImpl implements Session {
             ParsedLine pl = reader.getParsedLine();
             if (pl instanceof ParsedLineImpl) {
                 command = ((ParsedLineImpl) pl).program();
+            } else if (pl != null) {
+                command = pl.line();
             } else {
-                if (pl != null) {
-                    command = pl.line();
-                }
+                command = reader.getBuffer().toString();
             }
         } catch (EndOfFileException e) {
             command = null;
@@ -457,7 +465,7 @@ public class ConsoleSessionImpl implements Session {
     private void doExecute(CharSequence command) {
         try {
             Object result = session.execute(command);
-            if (result instanceof String) {
+            if (result != null) {
                 session.getConsole().println(session.format(result, Converter.INSPECT));
             }
         } catch (InterruptedException e) {
@@ -515,8 +523,9 @@ public class ConsoleSessionImpl implements Session {
             String[] scopes = ((String) get(Session.SCOPE)).split(":");
             List<Command> commands = registry.getCommands();
             for (String scope : scopes) {
+                boolean globalScope = Session.SCOPE_GLOBAL.equals(scope);
                 for (Command command : commands) {
-                    if ((Session.SCOPE_GLOBAL.equals(scope) || command.getScope().equals(scope)) && command.getName().equals(name)) {
+                    if ((globalScope || command.getScope().equals(scope)) && command.getName().equals(name)) {
                         return command.getScope() + ":" + name;
                     }
                 }
@@ -568,7 +577,9 @@ public class ConsoleSessionImpl implements Session {
             session.execute(script);
         } catch (Exception e) {
             LOGGER.debug("Error in initialization script {}", scriptFileName, e);
-            System.err.println("Error in initialization script: " + scriptFileName + ": " + e.getMessage());
+            if (!(e instanceof InterruptedException)) {
+                System.err.println("Error in initialization script: " + scriptFileName + ": " + e.getMessage());
+            }
         } finally {
             session.put("script", oldScript);
         }

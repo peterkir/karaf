@@ -35,12 +35,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.felix.resolver.ResolverImpl;
 import org.apache.felix.utils.properties.Properties;
+import org.apache.felix.utils.repository.AggregateRepository;
 import org.apache.karaf.features.FeaturesListener;
 import org.apache.karaf.features.FeaturesService;
 import org.apache.karaf.features.RegionDigraphPersistence;
 import org.apache.karaf.features.internal.management.FeaturesServiceMBeanImpl;
 import org.apache.karaf.features.internal.region.DigraphHelper;
-import org.apache.karaf.features.internal.repository.AggregateRepository;
 import org.apache.karaf.features.internal.repository.JsonRepository;
 import org.apache.karaf.features.internal.repository.XmlRepository;
 import org.apache.karaf.features.internal.resolver.Slf4jResolverLog;
@@ -303,8 +303,12 @@ public class Activator extends BaseActivator {
     
                     @Override
                     public void removedService(ServiceReference<FeaturesListener> reference, FeaturesListener service) {
-                        featuresService.unregisterListener(service);
-                        bundleContext.ungetService(reference);
+                        if (featuresService != null && service != null) {
+                            featuresService.unregisterListener(service);
+                        }
+                        if (bundleContext != null && reference != null) {
+                            bundleContext.ungetService(reference);
+                        }
                     }
                 }
         );

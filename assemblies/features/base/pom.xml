@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.apache.karaf.assemblies.features</groupId>
         <artifactId>features</artifactId>
-        <version>4.2.1-SNAPSHOT</version>
+        <version>4.3.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -37,6 +37,32 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>${javax.annotation.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.sun.activation</groupId>
+            <artifactId>javax.activation</artifactId>
+            <version>1.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>jaxb-runtime</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>txw2</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.sun.istack</groupId>
+            <artifactId>istack-commons-runtime</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.apache.karaf.specs</groupId>
             <artifactId>org.apache.karaf.specs.locator</artifactId>
@@ -82,7 +108,12 @@
             <artifactId>org.apache.felix.framework</artifactId>
             <scope>runtime</scope>
         </dependency>
-
+        <dependency>
+            <groupId>org.glassfish.external</groupId>
+            <artifactId>opendmk_jmxremote_optional_jar</artifactId>
+            <version>1.0-b01-ea</version>
+            <scope>runtime</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -150,9 +181,34 @@
                                     <outputDirectory>target/classes/resources/lib/endorsed</outputDirectory>
                                 </artifactItem>
                                 <artifactItem>
-                                    <groupId>org.apache.karaf.specs</groupId>
-                                    <artifactId>org.apache.karaf.specs.activator</artifactId>
-                                    <outputDirectory>target/classes/resources/lib/boot</outputDirectory>
+                                    <groupId>jakarta.xml.bind</groupId>
+                                    <artifactId>jakarta.xml.bind-api</artifactId>
+                                    <outputDirectory>target/classes/resources/lib/jdk9plus</outputDirectory>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>javax.annotation</groupId>
+                                    <artifactId>javax.annotation-api</artifactId>
+                                    <outputDirectory>target/classes/resources/lib/jdk9plus</outputDirectory>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>com.sun.activation</groupId>
+                                    <artifactId>javax.activation</artifactId>
+                                    <outputDirectory>target/classes/resources/lib/jdk9plus</outputDirectory>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.glassfish.jaxb</groupId>
+                                    <artifactId>jaxb-runtime</artifactId>
+                                    <outputDirectory>target/classes/resources/lib/jdk9plus</outputDirectory>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.glassfish.jaxb</groupId>
+                                    <artifactId>txw2</artifactId>
+                                    <outputDirectory>target/classes/resources/lib/jdk9plus</outputDirectory>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>com.sun.istack</groupId>
+                                    <artifactId>istack-commons-runtime</artifactId>
+                                    <outputDirectory>target/classes/resources/lib/jdk9plus</outputDirectory>
                                 </artifactItem>
                                 <artifactItem>
                                     <groupId>org.apache.karaf</groupId>
@@ -161,7 +217,17 @@
                                 </artifactItem>
                                 <artifactItem>
                                     <groupId>org.osgi</groupId>
-                                    <artifactId>org.osgi.core</artifactId>
+                                    <artifactId>osgi.core</artifactId>
+                                    <outputDirectory>target/classes/resources/lib/boot</outputDirectory>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.apache.karaf.specs</groupId>
+                                    <artifactId>org.apache.karaf.specs.activator</artifactId>
+                                    <outputDirectory>target/classes/resources/lib/boot</outputDirectory>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.glassfish.external</groupId>
+                                    <artifactId>opendmk_jmxremote_optional_jar</artifactId>
                                     <outputDirectory>target/classes/resources/lib/boot</outputDirectory>
                                 </artifactItem>
                                 <artifactItem>
@@ -173,7 +239,8 @@
                                     <groupId>org.apache.felix</groupId>
                                     <artifactId>org.apache.felix.framework</artifactId>
                                     <outputDirectory>target/classes/resources/system/org/apache/felix/org.apache.felix.framework/${felix.framework.version}</outputDirectory>
-                                    <destFileName>org.apache.felix.framework-${felix.framework.version}.jar</destFileName>
+                                    <destFileName>org.apache.felix.framework-${felix.framework.version}.jar
+                                    </destFileName>
                                 </artifactItem>
                                 <artifactItem>
                                     <groupId>${equinox.groupId}</groupId>
@@ -184,7 +251,7 @@
                                     <groupId>com.sun.winsw</groupId>
                                     <artifactId>winsw</artifactId>
                                     <version>${winsw.version}</version>
-                                    <classifier>bin</classifier>
+                                    <classifier>net4</classifier>
                                     <type>exe</type>
                                     <outputDirectory>target/classes/resources/bin/contrib</outputDirectory>
                                     <destFileName>karaf-service-win.exe</destFileName>
@@ -221,7 +288,7 @@
         <repository>
             <id>jenkins</id>
             <name>jenkins</name>
-            <url>http://repo.jenkins-ci.org/releases/</url>
+            <url>https://repo.jenkins-ci.org/releases/</url>
         </repository>
     </repositories>
 </project>

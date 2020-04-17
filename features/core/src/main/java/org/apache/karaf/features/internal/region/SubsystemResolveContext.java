@@ -28,13 +28,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import org.apache.felix.utils.repository.BaseRepository;
+import org.apache.felix.utils.resource.CapabilityImpl;
+import org.apache.felix.utils.resource.RequirementImpl;
+import org.apache.felix.utils.resource.ResourceImpl;
 import org.apache.karaf.features.FeaturesService;
 import org.apache.karaf.features.internal.download.Downloader;
-import org.apache.karaf.features.internal.repository.BaseRepository;
-import org.apache.karaf.features.internal.resolver.CapabilityImpl;
-import org.apache.karaf.features.internal.resolver.RequirementImpl;
 import org.apache.karaf.features.internal.resolver.ResolverUtil;
-import org.apache.karaf.features.internal.resolver.ResourceImpl;
 import org.eclipse.equinox.region.Region;
 import org.eclipse.equinox.region.RegionDigraph;
 import org.eclipse.equinox.region.RegionFilter;
@@ -45,9 +45,13 @@ import org.osgi.resource.Capability;
 import org.osgi.resource.Requirement;
 import org.osgi.resource.Resource;
 import org.osgi.resource.Wiring;
+import org.osgi.service.repository.ExpressionCombiner;
 import org.osgi.service.repository.Repository;
+import org.osgi.service.repository.RequirementBuilder;
+import org.osgi.service.repository.RequirementExpression;
 import org.osgi.service.resolver.HostedCapability;
 import org.osgi.service.resolver.ResolveContext;
+import org.osgi.util.promise.Promise;
 
 import static org.apache.karaf.features.internal.resolver.ResourceUtils.addIdentityRequirement;
 import static org.apache.karaf.features.internal.resolver.ResourceUtils.getUri;
@@ -348,6 +352,24 @@ public class SubsystemResolveContext extends ResolveContext {
                 result.put(entry.getKey(), caps);
             }
             return result;
+        }
+
+        @Override
+        public Promise<Collection<Resource>> findProviders(RequirementExpression expression) {
+            // TODO
+            return null;
+        }
+
+        @Override
+        public ExpressionCombiner getExpressionCombiner() {
+            // TODO
+            return null;
+        }
+
+        @Override
+        public RequirementBuilder newRequirementBuilder(String namespace) {
+            // TODO
+            return null;
         }
 
         private void wrap(Map<Capability, Capability> map, Subsystem subsystem, Resource resource) {

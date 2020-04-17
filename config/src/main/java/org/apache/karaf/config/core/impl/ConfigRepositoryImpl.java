@@ -22,12 +22,11 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.Dictionary;
 import java.util.Enumeration;
-import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.felix.utils.properties.TypedProperties;
 import org.apache.karaf.config.core.ConfigRepository;
@@ -70,7 +69,12 @@ public class ConfigRepositoryImpl implements ConfigRepository {
                 props.load(file);
                 props.put(FILEINSTALL_FILE_NAME, file.toURI().toString());
             } else {
-                file = new File(System.getProperty("karaf.etc"), pid + ".cfg");
+                if (properties.containsKey(FILEINSTALL_FILE_NAME)) {
+                    file = getCfgFileFromProperty(properties.get(FILEINSTALL_FILE_NAME));
+                }
+                if (file == null) {
+                    file = new File(System.getProperty("karaf.etc"), pid + ".cfg");
+                }
                 props.putAll(properties);
                 props.keySet().retainAll(properties.keySet());
                 props.save(file);
@@ -90,6 +94,15 @@ public class ConfigRepositoryImpl implements ConfigRepository {
         LOGGER.trace("Deleting configuration {}", pid);
         Configuration configuration = configAdmin.getConfiguration(pid, null);
         configuration.delete();
+    }
+
+    @Override
+    public boolean exists(String pid) throws Exception {
+        Configuration[] configurations = configAdmin.listConfigurations("(service.pid=" + pid + ")");
+        if (configurations == null || configurations.length == 0) {
+            return false;
+        }
+        return true;
     }
 
     private File getCfgFileFromProperties(Dictionary<String, Object> properties) throws URISyntaxException, MalformedURLException {
@@ -127,7 +140,7 @@ public class ConfigRepositoryImpl implements ConfigRepository {
                     } catch (URISyntaxException e) {
                         throw new IOException(e);
                     }
-                    if (file != null) {
+                    if (file != null && file.exists()) {
                         tp.load(file);
                     } else {
                         for (Enumeration<String> e = props.keys(); e.hasMoreElements();) {
@@ -158,7 +171,7 @@ public class ConfigRepositoryImpl implements ConfigRepository {
         if (alias != null && !"".equals(alias.trim())) {
             file = new File(new File(System.getProperty("karaf.etc")), factoryPid + "-" + alias + ".cfg");
         } else {
-            file = File.createTempFile(factoryPid + "-", ".cfg", new File(System.getProperty("karaf.etc")));
+            file = Files.createTempFile(new File(System.getProperty("karaf.etc")).toPath(), factoryPid + "-", ".cfg").toFile();
         }
         props.putAll(properties);
         props.save(file);

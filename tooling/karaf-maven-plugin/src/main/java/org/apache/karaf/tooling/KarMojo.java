@@ -19,6 +19,7 @@
 package org.apache.karaf.tooling;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -287,8 +288,7 @@ public class KarMojo extends MojoSupport {
                     metadata.setVersioning(versioning);
 
                     MetadataXpp3Writer metadataWriter = new MetadataXpp3Writer();
-                    try {
-                        Writer writer = new FileWriter(metadataTarget);
+                    try (Writer writer = new FileWriter(metadataTarget)) {
                         metadataWriter.write(writer, metadata);
                     } catch (Exception e) {
                         getLog().warn("Could not create maven-metadata-local.xml", e);
@@ -308,7 +308,7 @@ public class KarMojo extends MojoSupport {
 
                 if (artifact.isSnapshot()) {
                     // the artifact is a snapshot, create the maven-metadata-local.xml
-                    final File metadataTmp = File.createTempFile("maven-metadata-local.xml", ".tmp");
+                    final File metadataTmp = Files.createTempFile("maven-metadata-local.xml", ".tmp").toFile();
 
                     try {
                         MavenUtil.generateMavenMetadata(artifact, metadataTmp);

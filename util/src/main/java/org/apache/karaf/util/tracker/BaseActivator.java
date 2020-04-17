@@ -16,6 +16,7 @@
  */
 package org.apache.karaf.util.tracker;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
@@ -38,6 +39,8 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import org.osgi.framework.*;
+import org.osgi.service.cm.Configuration;
+import org.osgi.service.cm.ConfigurationAdmin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,6 +147,23 @@ public class BaseActivator implements BundleActivator, Runnable, ThreadFactory {
         }
     }
 
+    protected boolean ensureStartupConfiguration(String configId) throws IOException {
+        if (this.configuration != null) {
+            return true;
+        }
+        ConfigurationAdmin configurationAdmin = getTrackedService(ConfigurationAdmin.class);
+        if (configurationAdmin != null) {
+            Configuration configuration = configurationAdmin.getConfiguration(configId);
+            Dictionary<String, Object> properties = (configuration == null) ? null : configuration.getProperties();
+
+            if (properties != null) {
+                this.configuration = properties;
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Called in {@link #doOpen()}.
      *
@@ -239,6 +259,23 @@ public class BaseActivator implements BundleActivator, Runnable, ThreadFactory {
         return def;
     }
 
+    protected Class<?>[] getClassesArray(String key, String def) {
+        final String[] stringArray = getStringArray(key, def);
+        if (stringArray == null) {
+            return null;
+        }
+        final ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        return Stream.of(stringArray)
+                .map(it -> {
+                    try {
+                        return loader.loadClass(it.trim());
+                    } catch (final ClassNotFoundException e) {
+                        throw new IllegalArgumentException(e);
+                    }
+                })
+                .toArray(Class[]::new);
+    }
+
     protected String[] getStringArray(String key, String def) {
         Object val = null;
         if (configuration != null) {
@@ -257,7 +294,7 @@ public class BaseActivator implements BundleActivator, Runnable, ThreadFactory {
             return StreamSupport.stream(((Iterable<?>) val).spliterator(), false)
                     .map(Object::toString).toArray(String[]::new);
         } else {
-            return val.toString().split(",");
+            return val.toString().split("\\s*,\\s*");
         }
     }
 

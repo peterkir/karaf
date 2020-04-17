@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.apache.karaf.assemblies</groupId>
         <artifactId>assemblies</artifactId>
-        <version>4.2.1-SNAPSHOT</version>
+        <version>4.3.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -72,7 +72,8 @@
                 <directory>${project.basedir}/../..</directory>
                 <filtering>false</filtering>
                 <includes>
-                    <include>README</include>
+                    <include>README.md</include>
+                    <include>BUILDING.md</include>
                     <include>RELEASE*</include>
                     <include>LICENSE</include>
                     <include>NOTICE</include>

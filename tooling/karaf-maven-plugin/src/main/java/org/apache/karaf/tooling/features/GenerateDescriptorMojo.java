@@ -20,16 +20,7 @@ package org.apache.karaf.tooling.features;
 import static java.lang.String.format;
 import static org.apache.karaf.deployer.kar.KarArtifactInstaller.FEATURE_CLASSIFIER;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintStream;
-import java.io.StringWriter;
+import java.io.*;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -192,6 +183,20 @@ public class GenerateDescriptorMojo extends MojoSupport {
     private boolean includeTransitiveDependency;
 
     /**
+     * Flag indicating whether the plugin should mark transitive dependencies' <code>&lt;bundle&gt;</code> elements as a dependency.
+     * This flag has only an effect when {@link #includeTransitiveDependency} is <code>true</code>.
+     */
+    @Parameter(defaultValue = "false")
+    private boolean markTransitiveAsDependency;
+
+    /**
+     * Flag indicating whether the plugin should mark dependencies' in the <code>runtime</code> scope <code>&lt;bundle&gt;</code> elements as a dependency.
+     * This flag has only an effect when {@link #includeTransitiveDependency} is <code>true</code>.
+     */
+    @Parameter(defaultValue = "true")
+    private boolean markRuntimeScopeAsDependency;
+
+    /**
      * The standard behavior is to add dependencies as <code>&lt;bundle&gt;</code> elements to a <code>&lt;feature&gt;</code>
      * with the same name as the artifactId of the project.  This flag disables that behavior.
      * If this parameter is <code>true</code>, then two other parameters refine the list of bundles added to the primary feature:
@@ -342,7 +347,12 @@ public class GenerateDescriptorMojo extends MojoSupport {
                         throw new MojoExecutionException("Could not create directory for features file: " + dir);
                     }
                     filter(inputFile, outputFile);
-                    projectHelper.attachArtifact(project, attachmentArtifactType, attachmentArtifactClassifier, outputFile);
+                    getLog().info("Generation not enabled");
+                    getLog().info("Attaching artifact");
+                    //projectHelper.attachArtifact(project, attachmentArtifactType, attachmentArtifactClassifier, outputFile);
+                    Artifact artifact = factory.createArtifactWithClassifier(project.getGroupId(), project.getArtifactId(), project.getVersion(), attachmentArtifactType, attachmentArtifactClassifier);
+                    artifact.setFile(outputFile);
+                    project.setArtifact(artifact);
                     return;
                 }
             }
@@ -357,6 +367,7 @@ public class GenerateDescriptorMojo extends MojoSupport {
                 try (PrintStream out = new PrintStream(new FileOutputStream(outputFile))) {
                     writeFeatures(out);
                 }
+                getLog().info("Attaching features XML");
                 // now lets attach it
                 projectHelper.attachArtifact(project, attachmentArtifactType, attachmentArtifactClassifier, outputFile);
             } else {
@@ -507,9 +518,10 @@ public class GenerateDescriptorMojo extends MojoSupport {
 
                     File bundleFile = this.dependencyHelper.resolve(artifact, getLog());
                     Manifest manifest = getManifest(bundleFile);
+                    boolean bundleNeedsWrapping = false;
                     if (manifest == null || !ManifestUtils.isBundle(manifest)) {
                         bundleName = "wrap:" + bundleName;
-                        needWrap = true;
+                        bundleNeedsWrapping = true;
                     }
 
                     Bundle bundle = null;
@@ -528,11 +540,17 @@ public class GenerateDescriptorMojo extends MojoSupport {
                             simplifyBundleDependencies && isBundleIncludedTransitively(feature, otherFeatures, bundle);
                         if (!includedTransitively && (!"provided".equals(entry.getScope()) || !ignoreScopeProvided)) {
                             feature.getBundle().add(bundle);
+                            needWrap |= bundleNeedsWrapping;
+                        }
+
+                        if (
+                                (markRuntimeScopeAsDependency && "runtime".equals( entry.getScope() )) ||
+                                (markTransitiveAsDependency && entry.isTransitive())
+                        ) {
+                            bundle.setDependency(true);
                         }
                     }
-                    if ("runtime".equals(entry.getScope())) {
-                        bundle.setDependency(true);
-                    }
+
                     if (startLevel != null && bundle.getStartLevel() == 0) {
                         bundle.setStartLevel(startLevel);
                     }
@@ -661,24 +679,44 @@ public class GenerateDescriptorMojo extends MojoSupport {
      * Extract the MANIFEST from the give file.
      */
 
-    private Manifest getManifest(File file) throws IOException {
-        final InputStream is;
-        try {
-            is = Files.newInputStream(file.toPath());
-        } catch (Exception e) {
-            getLog().warn("Error while opening artifact", e);
-            return null;
-        }
-
-        try (BufferedInputStream bis = new BufferedInputStream(is)) {
-            bis.mark(256 * 1024);
-
-            try (JarInputStream jar = new JarInputStream(bis)) {
-                Manifest m = jar.getManifest();
-                if (m == null) {
-                    getLog().warn("Manifest not present in the first entry of the zip - " + file.getName());
+    private Manifest getManifest(File file) {
+        // In case of a maven build below the 'package' phase, references to the 'target/classes'
+        // directories are passed in instead of jar-file references.
+        if(file.isDirectory()) {
+            File manifestFile = new File(file, "META-INF/MANIFEST.MF");
+            if(manifestFile.exists() && manifestFile.isFile()) {
+                try {
+                    InputStream manifestInputStream = new FileInputStream(manifestFile);
+                    return new Manifest(manifestInputStream);
+                } catch (IOException e) {
+                    getLog().warn("Error while reading artifact from directory", e);
+                    return null;
                 }
-                return m;
+            }
+            getLog().warn("Manifest not present in the module directory " + file.getAbsolutePath());
+            return null;
+        } else {
+            final InputStream is;
+            try {
+                is = Files.newInputStream(file.toPath());
+            } catch (Exception e) {
+                getLog().warn("Error while opening artifact", e);
+                return null;
+            }
+
+            try (BufferedInputStream bis = new BufferedInputStream(is)) {
+                bis.mark(256 * 1024);
+
+                try (JarInputStream jar = new JarInputStream(bis)) {
+                    Manifest m = jar.getManifest();
+                    if (m == null) {
+                        getLog().warn("Manifest not present in the first entry of the zip - " + file.getName());
+                    }
+                    return m;
+                }
+            } catch (IOException e) {
+                getLog().warn("Error while reading artifact", e);
+                return null;
             }
         }
     }

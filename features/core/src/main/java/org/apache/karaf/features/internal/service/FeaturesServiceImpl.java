@@ -45,6 +45,7 @@ import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -262,11 +263,11 @@ public class FeaturesServiceImpl implements FeaturesService, Deployer.DeployCall
     public void registerListener(FeaturesListener listener) {
         listeners.add(listener);
         try {
-            Set<String> repositoriesList = new TreeSet<>();
-            Map<String, Set<String>> installedFeatures = new TreeMap<>();
+            Set<String> repositoriesList;
+            Map<String, Set<String>> installedFeatures;
             synchronized (lock) {
-                repositoriesList.addAll(state.repositories);
-                installedFeatures.putAll(copy(state.installedFeatures));
+                repositoriesList = new TreeSet<>(state.repositories);
+                installedFeatures = new TreeMap<>(copy(state.installedFeatures));
             }
             for (String uri : repositoriesList) {
                 Repository repository = repositories.create(URI.create(uri), false);
@@ -353,6 +354,13 @@ public class FeaturesServiceImpl implements FeaturesService, Deployer.DeployCall
     //
 
     @Override
+    public Feature[] repositoryProvidedFeatures(URI uri) throws Exception {
+        Features features = JaxbUtil.unmarshal(uri.toURL().toExternalForm(), true);
+        Feature[] array = new Feature[features.getFeature().size()];
+        return features.getFeature().toArray(array);
+    }
+
+    @Override
     public void validateRepository(URI uri) throws Exception {
         throw new UnsupportedOperationException();
     }
@@ -415,7 +423,11 @@ public class FeaturesServiceImpl implements FeaturesService, Deployer.DeployCall
             for (String r : state.repositories) {
                 if (!uri.toString().equals(r)) {
                     Repository rep = repositories.getRepository(r);
-                    repos.addAll(repositories.getRepositoryClosure(rep));
+                    if (rep != null) {
+                        repos.addAll(repositories.getRepositoryClosure(rep));
+                    } else {
+                        throw new IllegalArgumentException("Repository URI " + uri + " seems to have changed, can't remove repository");
+                    }
                 }
             }
             for (Repository rep : repos) {
@@ -909,7 +921,7 @@ public class FeaturesServiceImpl implements FeaturesService, Deployer.DeployCall
             saveState();
             stateCopy = state.copy();
         }
-        doProvisionInThread(requirements, emptyMap(), stateCopy, getFeaturesById(), options);
+        doProvisionInThread(requirements, emptyMap(), stateCopy, getFeaturesById(), options, false);
     }
 
     @Override
@@ -957,13 +969,38 @@ public class FeaturesServiceImpl implements FeaturesService, Deployer.DeployCall
                                     final State state,
                                     final Map<String, Feature> featureById,
                                     final EnumSet<Option> options) throws Exception {
+        doProvisionInThread(requirements, stateChanges, state, featureById, options, true);
+    }
+
+    /**
+     * Actual deployment needs to be done in a separate thread.
+     * The reason is that if the console is refreshed, the current thread which is running
+     * the command may be interrupted while waiting for the refresh to be done, leading
+     * to bundles not being started after the refresh.
+     *
+     * @param requirements the provided requirements to match.
+     * @param stateChanges the current features state.
+     * @param state the current provisioning state.
+     * @param options the provisioning options.
+     * @param wait wait for provisioning to complete
+     * @throws Exception in case of provisioning failure.
+     */
+    private void doProvisionInThread(final Map<String, Set<String>> requirements,
+                                     final Map<String, Map<String, FeatureState>> stateChanges,
+                                     final State state,
+                                     final Map<String, Feature> featureById,
+                                     final EnumSet<Option> options,
+                                     boolean wait) throws Exception {
         try {
             final String outputFile = this.outputFile.get();
             this.outputFile.set(null);
-            executor.submit(() -> {
+            Future<Object> future = executor.submit(() -> {
                 doProvision(requirements, stateChanges, state, featureById, options, outputFile);
                 return null;
-            }).get();
+            });
+            if (wait) {
+                future.get();
+            }
         } catch (ExecutionException e) {
             Throwable t = e.getCause();
             if (t instanceof RuntimeException) {
@@ -1139,6 +1176,11 @@ public class FeaturesServiceImpl implements FeaturesService, Deployer.DeployCall
     @Override
     public void installConfigs(Feature feature) throws IOException, InvalidSyntaxException {
         installSupport.installConfigs(feature);
+    }
+
+    @Override
+    public void deleteConfigs(Feature feature) throws IOException, InvalidSyntaxException {
+        installSupport.deleteConfigs(feature);
     }
 
     @Override

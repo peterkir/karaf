@@ -57,7 +57,8 @@ public interface FeaturesService {
         Verbose,
         Upgrade,
         DisplayFeaturesWiring,
-        DisplayAllWiring
+        DisplayAllWiring,
+        DeleteConfigurations
     }
 
     /**
@@ -121,6 +122,8 @@ public interface FeaturesService {
     void validateRepository(URI uri) throws Exception;
 
     boolean isRepositoryUriBlacklisted(URI uri);
+
+    Feature[] repositoryProvidedFeatures(URI uri) throws Exception;
 
     void addRepository(URI uri) throws Exception;
 

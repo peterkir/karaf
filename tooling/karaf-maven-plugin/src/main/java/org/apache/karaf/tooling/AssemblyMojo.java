@@ -162,6 +162,12 @@ public class AssemblyMojo extends MojoSupport {
     protected int defaultStartLevel = 30;
 
     /**
+     * List of additional allowed protocols on bundles location URI
+     */
+    @Parameter
+    private List<String> extraProtocols;
+
+    /**
      * List of compile-scope features XML files to be used in startup stage (etc/startup.properties)
      */
     @Parameter
@@ -275,6 +281,18 @@ public class AssemblyMojo extends MojoSupport {
      */
     @Parameter
     private String generateConsistencyReport;
+
+    /**
+     * When generating consistency report, we can specify project name. By default it's "Apache Karaf"
+     */
+    @Parameter(defaultValue = "Apache Karaf")
+    private String consistencyReportProjectName;
+
+    /**
+     * When generating consistency report, we can specify project version. By default it's "${project.version}"
+     */
+    @Parameter(defaultValue = "${project.version}")
+    private String consistencyReportProjectVersion;
 
     /*
      * KARs are not configured using Maven plugin configuration, but rather detected from dependencies.
@@ -462,6 +480,7 @@ public class AssemblyMojo extends MojoSupport {
         Builder builder = Builder.newInstance();
 
         // Set up miscellaneous options
+        builder.extraProtocols(extraProtocols);
         builder.offline(mavenSession.isOffline());
         builder.localRepository(localRepo.getBasedir());
         builder.resolverWrapper((resolver) -> new ReactorMavenResolver(reactor, resolver));
@@ -475,6 +494,8 @@ public class AssemblyMojo extends MojoSupport {
         builder.pidsToExtract(pidsToExtract);
         builder.writeProfiles(writeProfiles);
         builder.generateConsistencyReport(generateConsistencyReport);
+        builder.setConsistencyReportProjectName(consistencyReportProjectName);
+        builder.setConsistencyReportProjectVersion(consistencyReportProjectVersion);
         builder.environment(environment);
         builder.defaultStartLevel(defaultStartLevel);
         if (featuresProcessing != null) {
@@ -522,14 +543,6 @@ public class AssemblyMojo extends MojoSupport {
                .bundles(toArray(startupBundles))
                .profiles(toArray(startupProfiles));
 
-        // Boot stage
-        builder.defaultStage(Builder.Stage.Boot)
-                .kars(toArray(bootKars))
-                .repositories(bootFeatures.isEmpty() && bootProfiles.isEmpty() && installAllFeaturesByDefault, toArray(bootRepositories))
-                .features(toArray(bootFeatures))
-                .bundles(toArray(bootBundles))
-                .profiles(toArray(bootProfiles));
-
         // Installed stage
         builder.defaultStage(Builder.Stage.Installed)
                 .kars(toArray(installedKars))
@@ -537,6 +550,14 @@ public class AssemblyMojo extends MojoSupport {
                 .features(toArray(installedFeatures))
                 .bundles(toArray(installedBundles))
                 .profiles(toArray(installedProfiles));
+
+        // Boot stage
+        builder.defaultStage(Builder.Stage.Boot)
+                .kars(toArray(bootKars))
+                .repositories(bootFeatures.isEmpty() && bootProfiles.isEmpty() && installAllFeaturesByDefault, toArray(bootRepositories))
+                .features(toArray(bootFeatures))
+                .bundles(toArray(bootBundles))
+                .profiles(toArray(bootProfiles));
 
         // Generate the assembly
         builder.generateAssembly();
@@ -800,6 +821,7 @@ public class AssemblyMojo extends MojoSupport {
         bootRepositories = nonNullList(bootRepositories);
         installedRepositories = nonNullList(installedRepositories);
         blacklistedRepositories = nonNullList(blacklistedRepositories);
+        extraProtocols = nonNullList(extraProtocols);
         startupBundles = nonNullList(startupBundles);
         bootBundles = nonNullList(bootBundles);
         installedBundles = nonNullList(installedBundles);

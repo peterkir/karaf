@@ -20,7 +20,6 @@ package org.apache.felix.eventadmin.impl.adapter;
 
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleEvent;
-import org.osgi.framework.BundleListener;
 import org.osgi.framework.SynchronousBundleListener;
 import org.osgi.service.event.Event;
 import org.osgi.service.event.EventAdmin;
@@ -39,11 +38,11 @@ public class BundleEventAdapter extends AbstractAdapter implements SynchronousBu
 {
     /**
      * The constructor of the adapter. This will register the adapter with the given
-     * context as a <tt>BundleListener</tt> and subsequently, will post received
+     * context as a <code>BundleListener</code> and subsequently, will post received
      * events via the given EventAdmin.
      *
      * @param context The bundle context with which to register as a listener.
-     * @param admin The <tt>EventAdmin</tt> to use for posting events.
+     * @param admin The <code>EventAdmin</code> to use for posting events.
      */
     public BundleEventAdapter(final BundleContext context, final EventAdmin admin)
     {
@@ -58,18 +57,18 @@ public class BundleEventAdapter extends AbstractAdapter implements SynchronousBu
 
     /**
      * Once a bundle event is received this method assembles and posts an event via
-     * the <tt>EventAdmin</tt> as specified in 113.6.4 OSGi R4 compendium.
+     * the <code>EventAdmin</code> as specified in 113.6.4 OSGi R4 compendium.
      *
      * @param event The event to adapt.
      */
     @Override
     public void bundleChanged(final BundleEvent event)
     {
-        final Dictionary<String, Object> properties = new Hashtable<String, Object>();
+        final Dictionary<String, Object> properties = new Hashtable<>();
 
         properties.put(EventConstants.EVENT, event);
 
-        properties.put("bundle.id", new Long(event.getBundle()
+        properties.put("bundle.id", Long.valueOf(event.getBundle()
             .getBundleId()));
 
         final String symbolicName = event.getBundle().getSymbolicName();
@@ -82,7 +81,7 @@ public class BundleEventAdapter extends AbstractAdapter implements SynchronousBu
 
         properties.put("bundle", event.getBundle());
 
-        final StringBuffer topic = new StringBuffer(BundleEvent.class
+        final StringBuilder topic = new StringBuilder(BundleEvent.class
             .getName().replace('.', '/')).append('/');
 
         switch (event.getType())

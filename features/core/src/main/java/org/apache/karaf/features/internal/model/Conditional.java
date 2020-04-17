@@ -25,7 +25,6 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.bind.annotation.XmlType;
 
-import org.apache.karaf.features.Blacklisting;
 import org.apache.karaf.features.Feature;
 
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -90,7 +89,7 @@ public class Conditional extends Content implements org.apache.karaf.features.Co
     }
 
     public String getConditionId() {
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         for (String cond : getCondition()) {
             if (sb.length() > 0) {
                 sb.append("_");

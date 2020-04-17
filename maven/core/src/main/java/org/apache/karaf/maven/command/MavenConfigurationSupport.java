@@ -416,7 +416,7 @@ public abstract class MavenConfigurationSupport implements Action {
         if (mavenSecuritySettings != null && mavenSettings != null) {
             masterPassword = cipher.decryptDecorated(mavenSecuritySettings.getMaster(), masterMasterPassword);
             DefaultSecDispatcher dispatcher = new DefaultSecDispatcher();
-            DefaultSettingsDecrypter decrypter = new DefaultSettingsDecrypter();
+            DefaultSettingsDecrypter decrypter = new DefaultSettingsDecrypter(new DefaultSecDispatcher());
             try {
                 dispatcher.setConfigurationFile(securitySettings.value.getAbsolutePath());
                 Field f = dispatcher.getClass().getDeclaredField("_cipher");
@@ -467,14 +467,13 @@ public abstract class MavenConfigurationSupport implements Action {
                     repositories[0] = repositories[0].substring(1);
                 }
 
-                List<String> newRepositories = new LinkedList<>();
-                newRepositories.addAll(Arrays.asList(repositories));
+                List<String> newRepositories = new LinkedList<>(Arrays.asList(repositories));
 
                 // append all repositories from all active profiles from available settings.xml
                 if (mavenSettings != null) {
                     // see org.ops4j.pax.url.mvn.internal.config.MavenConfigurationImpl.getRepositories()
                     Set<String> activeProfiles = new LinkedHashSet<>(mavenSettings.getActiveProfiles());
-                    Map<String, Profile> profiles = (Map<String, Profile>)mavenSettings.getProfilesAsMap();
+                    Map<String, Profile> profiles = mavenSettings.getProfilesAsMap();
                     profiles.values().stream()
                             .filter((profile) -> profile.getActivation() != null && profile.getActivation().isActiveByDefault())
                             .map(Profile::getId)
@@ -493,7 +492,7 @@ public abstract class MavenConfigurationSupport implements Action {
 
                             if (repo.getReleases() != null) {
                                 if (!repo.getReleases().isEnabled()) {
-                                    builder.append(ServiceConstants.SEPARATOR_OPTIONS + ServiceConstants.OPTION_DISALLOW_RELEASES);
+                                    builder.append(ServiceConstants.SEPARATOR_OPTIONS).append(ServiceConstants.OPTION_DISALLOW_RELEASES);
                                 }
                                 SourceAnd<String> up = updatePolicy(repo.getReleases().getUpdatePolicy());
                                 addPolicy(builder, "".equals(up.val()) ? "never" : up.val(), ServiceConstants.OPTION_RELEASES_UPDATE);
@@ -502,7 +501,7 @@ public abstract class MavenConfigurationSupport implements Action {
                             }
                             if (repo.getSnapshots() != null) {
                                 if (repo.getSnapshots().isEnabled()) {
-                                    builder.append(ServiceConstants.SEPARATOR_OPTIONS + ServiceConstants.OPTION_ALLOW_SNAPSHOTS);
+                                    builder.append(ServiceConstants.SEPARATOR_OPTIONS).append(ServiceConstants.OPTION_ALLOW_SNAPSHOTS);
                                 }
                                 SourceAnd<String> up = updatePolicy(repo.getSnapshots().getUpdatePolicy());
                                 addPolicy(builder, "".equals(up.val()) ? "never" : up.val(), ServiceConstants.OPTION_SNAPSHOTS_UPDATE);
@@ -591,9 +590,9 @@ public abstract class MavenConfigurationSupport implements Action {
         File result = null;
         if (files != null && files.length > 0) {
             List<String> names = new ArrayList<>(Arrays.stream(files).map(File::getName)
-                    .collect(TreeSet<String>::new, TreeSet::add, TreeSet::addAll));
+                    .collect(TreeSet::new, TreeSet::add, TreeSet::addAll));
 
-            names.add(String.format(fileNameFormat, new Date().getTime()));
+            names.add(String.format(fileNameFormat, System.currentTimeMillis()));
 
             while (names.size() > MAX_SEQUENCE_SIZE) {
                 String name = names.remove(0);

@@ -17,7 +17,7 @@
 	<parent>
 		<groupId>org.apache.karaf</groupId>
 		<artifactId>karaf</artifactId>
-		<version>4.2.1-SNAPSHOT</version>
+		<version>4.3.0-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -185,12 +185,12 @@
 					</dependency>
 					<dependency>
 						<groupId>org.osgi</groupId>
-						<artifactId>org.osgi.core</artifactId>
+						<artifactId>osgi.core</artifactId>
 						<version>${osgi.version}</version>
 					</dependency>
 					<dependency>
 						<groupId>org.osgi</groupId>
-						<artifactId>org.osgi.compendium</artifactId>
+						<artifactId>osgi.cmpn</artifactId>
 						<version>${osgi.compendium.version}</version>
 					</dependency>
 					<dependency>
@@ -203,7 +203,7 @@
 			<plugin>
 				<groupId>org.asciidoctor</groupId>
 				<artifactId>asciidoctor-maven-plugin</artifactId>
-				<version>1.5.2</version>
+				<version>1.5.6</version>
 				<executions>
 					<execution>
 						<id>output-html</id>
@@ -231,7 +231,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-scm-publish-plugin</artifactId>
-				<version>1.0-beta-2</version>
+				<version>3.0.0</version>
 				<configuration>
 					<checkinComment>[scm-publish] Updating main site with Karaf documentation</checkinComment>
 					<pubScmUrl>scm:svn:https://svn.apache.org/repos/asf/karaf/site/production/manual/latest</pubScmUrl>
@@ -241,7 +241,6 @@
 			<plugin>
 				<groupId>org.apache.felix</groupId>
 				<artifactId>maven-bundle-plugin</artifactId>
-				<version>3.3.0</version>
 				<configuration>
 					<instructions>
 						<Web-ContextPath>/documentation</Web-ContextPath>

@@ -23,13 +23,7 @@ import org.apache.karaf.scheduler.ScheduleOptions;
 import org.apache.karaf.scheduler.Scheduler;
 import org.apache.karaf.scheduler.SchedulerError;
 import org.quartz.*;
-import org.quartz.impl.DirectSchedulerFactory;
-import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.impl.matchers.GroupMatcher;
-import org.quartz.simpl.CascadingClassLoadHelper;
-import org.quartz.simpl.RAMJobStore;
-import org.quartz.spi.JobStore;
-import org.quartz.spi.ThreadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +47,9 @@ public class QuartzScheduler implements Scheduler {
     /** Map key for the scheduling options. */
     static final String DATA_MAP_OPTIONS = "QuartzJobScheduler.Options";
 
+    /** Map key for non serializable context. */
+    static final String DATA_MAP_CONTEXT = "QuartzJobScheduler.Context";
+
     /** Map key for the logger. */
     static final String DATA_MAP_LOGGER = "QuartzJobScheduler.Logger";
 
@@ -65,7 +62,7 @@ public class QuartzScheduler implements Scheduler {
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(QuartzScheduler.class.getClassLoader());
-            StdSchedulerFactory factory = new StdSchedulerFactory(configuration);
+            KarafStdSchedulerFactory factory = new KarafStdSchedulerFactory(configuration);
             scheduler = factory.getScheduler();
             scheduler.start();
         } catch (Throwable t) {
@@ -109,12 +106,18 @@ public class QuartzScheduler implements Scheduler {
                                    final Object  job,
                                    final InternalScheduleOptions options) {
         final JobDataMap jobDataMap = new JobDataMap();
+        final JobDataMap jobContextMap = new JobDataMap();
 
-        jobDataMap.put(DATA_MAP_OBJECT, job);
-
+        // serializable data
         jobDataMap.put(DATA_MAP_NAME, jobName);
-        jobDataMap.put(DATA_MAP_LOGGER, this.logger);
         jobDataMap.put(DATA_MAP_OPTIONS, options);
+
+        // non serializable data
+        jobContextMap.put(DATA_MAP_OBJECT, job);
+        jobContextMap.put(DATA_MAP_LOGGER, this.logger);
+
+        // temporary storage
+        jobDataMap.put(DATA_MAP_CONTEXT, jobContextMap);
 
         return jobDataMap;
     }
@@ -195,10 +198,6 @@ public class QuartzScheduler implements Scheduler {
         }
         final InternalScheduleOptions opts = (InternalScheduleOptions)options;
 
-        if ( opts.argumentException != null ) {
-            throw opts.argumentException;
-        }
-
         // as this method might be called from unbind and during
         // unbind a deactivate could happen, we check the scheduler first
         final org.quartz.Scheduler s = this.scheduler;
@@ -225,7 +224,7 @@ public class QuartzScheduler implements Scheduler {
             opts.name = name;
         }
 
-        final Trigger trigger = opts.trigger.withIdentity(name).build();
+        final Trigger trigger = opts.compile().withIdentity(name).build();
 
         // create the data map
         final JobDataMap jobDataMap = this.initDataMap(name, job, opts);
@@ -241,28 +240,30 @@ public class QuartzScheduler implements Scheduler {
     }
 
     @Override
-    public void reschedule(String name, ScheduleOptions options) throws SchedulerError {
+    public void reschedule(String jobName, ScheduleOptions options) throws SchedulerError {
         final org.quartz.Scheduler s = this.scheduler;
-        if (name == null) {
+        if (jobName == null) {
             throw new IllegalArgumentException("Job name is mandatory");
         }
-        JobKey key = JobKey.jobKey(name);
+        JobKey key = JobKey.jobKey(jobName);
         if (key == null) {
-            throw new IllegalStateException("No job found with name " + name);
+            throw new IllegalStateException("No job found with name " + jobName);
         }
         try {
             JobDetail detail = s.getJobDetail(key);
 
-            Object job = detail.getJobDataMap().get(DATA_MAP_OBJECT);
+            final String contextKey = key.toString();
+            JobDataMap karafContext = ((KarafStdScheduler) s).getStorage().get(contextKey);
+            Object job = karafContext.get(QuartzScheduler.DATA_MAP_OBJECT);
 
             s.deleteJob(key);
 
             final InternalScheduleOptions opts = (InternalScheduleOptions)options;
-            Trigger trigger = opts.trigger.withIdentity(name).build();
-            JobDataMap jobDataMap = this.initDataMap(name, job, opts);
-            detail = createJobDetail(name, jobDataMap, opts.canRunConcurrently);
+            Trigger trigger = opts.compile().withIdentity(jobName).build();
+            JobDataMap jobDataMap = this.initDataMap(jobName, job, opts);
+            detail = createJobDetail(jobName, jobDataMap, opts.canRunConcurrently);
 
-            logger.debug("Update job scheduling {} with name {} and trigger {}", job, name, trigger);
+            logger.debug("Update job scheduling {} with name {} and trigger {}", job, jobName, trigger);
             s.scheduleJob(detail, trigger);
         } catch (SchedulerException e) {
             throw new SchedulerError(e);
@@ -291,17 +292,16 @@ public class QuartzScheduler implements Scheduler {
     }
 
     @Override
-    public Map<Object, ScheduleOptions> getJobs() throws SchedulerError {
+    public Map<String, ScheduleOptions> getJobs() throws SchedulerError {
         try {
-            Map<Object, ScheduleOptions> jobs = new HashMap<>();
+            Map<String, ScheduleOptions> jobs = new HashMap<>();
             org.quartz.Scheduler s = this.scheduler;
             if (s != null) {
                 for (String group : s.getJobGroupNames()) {
                     for (JobKey key : s.getJobKeys(GroupMatcher.jobGroupEquals(group))) {
                         JobDetail detail = s.getJobDetail(key);
                         ScheduleOptions options = (ScheduleOptions) detail.getJobDataMap().get(DATA_MAP_OPTIONS);
-                        Object job = detail.getJobDataMap().get(DATA_MAP_OBJECT);
-                        jobs.put(job, options);
+                        jobs.put(key.getName(), options);
                     }
                 }
             }
